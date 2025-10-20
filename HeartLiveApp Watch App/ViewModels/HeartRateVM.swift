@@ -6,7 +6,6 @@
 //
 
 import Foundation
-import HealthKit
 import Combine
 import WatchKit
 
@@ -14,80 +13,83 @@ import WatchKit
 final class HeartRateVM: ObservableObject {
     @Published var bpmText: String = "--"
     @Published var status: String = "Not started"
-    @Published var authorized: Bool = false
+    @Published var authorized: Bool = true  // Always authorized for mock mode
     @Published var recentBPM: [Int] = []
 
-    private let hk = HealthKitService()
-    private var stream: HeartRateStream?
     private var cancellables: Set<AnyCancellable> = []
     private let maxHistory = 24 // 2 minutes at 5s intervals
+    
+    // Mock data
+    private var mockTimer: Timer?
+    private var currentBPM = 72
 
     func requestAuth() async {
-        do {
-            try await hk.requestAuthorization()
-            authorized = true
-            status = "Authorized"
-        } catch {
-            authorized = false
-            status = "Not authorized"
-        }
+        // Mock authorization - always succeeds
+        authorized = true
+        status = "Ready (Mock Mode)"
     }
 
     func start() {
-        guard authorized else { status = "Not authorized"; return }
-        stream = HeartRateStream(store: hk.store)
+        status = "Live"
+        mockTimer?.invalidate()
         
-        stream?.$bpm
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] v in
+        // Generate initial realistic heart rate
+        currentBPM = Int.random(in: 65...85)
+        
+        mockTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { [weak self] _ in
+            guard let self = self else { return }
+            Task { @MainActor [weak self] in
                 guard let self = self else { return }
-                if let bpm = v {
-                    self.bpmText = String(bpm)
-                    self.recentBPM.append(bpm)
-                    if self.recentBPM.count > self.maxHistory {
-                        self.recentBPM.removeFirst()
-                    }
-                } else {
-                    self.bpmText = "--"
+                
+                // Simulate realistic heart rate variation
+                let change = Int.random(in: -3...3)
+                self.currentBPM = max(55, min(120, self.currentBPM + change))
+                
+                self.bpmText = String(self.currentBPM)
+                self.recentBPM.append(self.currentBPM)
+                if self.recentBPM.count > self.maxHistory {
+                    self.recentBPM.removeFirst()
                 }
             }
-            .store(in: &cancellables)
-        
-        stream?.$state
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] st in self?.status = vmStatusText(st) }
-            .store(in: &cancellables)
-        
-        do {
-            try stream?.start()
-            WKInterfaceDevice.current().play(.start)
-        } catch {
-            status = "Failed to start"
         }
+        
+        // Fire immediately for first reading
+        bpmText = String(currentBPM)
+        recentBPM.append(currentBPM)
+        
+        WKInterfaceDevice.current().play(.start)
     }
 
     func pause() {
-        stream?.pause()
+        mockTimer?.invalidate()
+        status = "Paused"
         WKInterfaceDevice.current().play(.stop)
     }
     
     func resume() {
-        stream?.resume()
+        status = "Live"
+        mockTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { [weak self] _ in
+            guard let self = self else { return }
+            Task { @MainActor [weak self] in
+                guard let self = self else { return }
+                
+                let change = Int.random(in: -3...3)
+                self.currentBPM = max(55, min(120, self.currentBPM + change))
+                
+                self.bpmText = String(self.currentBPM)
+                self.recentBPM.append(self.currentBPM)
+                if self.recentBPM.count > self.maxHistory {
+                    self.recentBPM.removeFirst()
+                }
+            }
+        }
         WKInterfaceDevice.current().play(.start)
     }
     
     func end() {
-        stream?.end()
-        cancellables.removeAll()
+        mockTimer?.invalidate()
+        mockTimer = nil
+        status = "Ended"
         WKInterfaceDevice.current().play(.success)
-    }
-}
-
-private func vmStatusText(_ st: HKWorkoutSessionState) -> String {
-    switch st {
-    case .running: return "Live"
-    case .paused: return "Paused"
-    case .ended: return "Ended"
-    default: return "Not started"
     }
 }
