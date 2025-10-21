@@ -12,29 +12,29 @@ struct HeartRateView: View {
     @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
-        VStack(spacing: 12) {
+        VStack(spacing: 8) {
             // Header
             Text("Heart Rate")
-                .font(.system(.headline, design: .rounded))
+                .font(.system(.subheadline, design: .rounded))
                 .fontWeight(.semibold)
             
             // Main BPM Display with Label
-            VStack(spacing: 4) {
+            VStack(spacing: 2) {
                 HStack(alignment: .firstTextBaseline, spacing: 4) {
                     Text(vm.bpmText)
-                        .font(.system(size: 48, weight: .bold, design: .rounded))
+                        .font(.system(size: 42, weight: .bold, design: .rounded))
                         .minimumScaleFactor(0.7)
                     
                     Text("BPM")
-                        .font(.system(.title3, design: .rounded))
+                        .font(.system(.body, design: .rounded))
                         .foregroundColor(.secondary)
                 }
                 
                 Text(vm.status)
-                    .font(.system(.caption, design: .rounded))
+                    .font(.system(.caption2, design: .rounded))
                     .foregroundColor(.secondary)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 4)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 3)
                     .background(
                         Capsule()
                             .fill(statusColor.opacity(0.2))
@@ -43,13 +43,13 @@ struct HeartRateView: View {
 
             // Sparkline with label
             if vm.recentBPM.count > 1 {
-                VStack(spacing: 2) {
+                VStack(spacing: 1) {
                     Text("Trend")
                         .font(.system(.caption2, design: .rounded))
                         .foregroundColor(.secondary)
                     
                     SparklineView(data: vm.recentBPM)
-                        .frame(height: 35)
+                        .frame(height: 28)
                         .padding(.horizontal, 8)
                 }
             }
@@ -91,6 +91,16 @@ struct HeartRateView: View {
                     .buttonStyle(.bordered)
                     .tint(.red)
                 }
+            }
+            
+            // Reset button (shown after session ends)
+            if vm.status == "Ended" {
+                Button(action: { vm.reset() }) {
+                    Label("Reset", systemImage: "arrow.counterclockwise")
+                        .font(.system(.caption, design: .rounded))
+                }
+                .buttonStyle(.bordered)
+                .tint(.blue)
             }
         }
         .padding(12)

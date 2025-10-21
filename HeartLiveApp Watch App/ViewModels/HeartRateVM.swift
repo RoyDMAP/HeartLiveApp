@@ -92,4 +92,14 @@ final class HeartRateVM: ObservableObject {
         status = "Ended"
         WKInterfaceDevice.current().play(.success)
     }
+    
+    func reset() {
+        mockTimer?.invalidate()
+        mockTimer = nil
+        bpmText = "--"
+        status = "Not started"
+        recentBPM.removeAll()
+        currentBPM = 72
+        WKInterfaceDevice.current().play(.click)
+    }
 }
